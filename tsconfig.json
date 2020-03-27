@@ -1,0 +1,29 @@
+{
+    "include": ["src", "types"],
+    "compilerOptions": {
+      "target": "esnext",
+      "module": "esnext",
+      "lib": ["esnext", "dom"],
+      "importHelpers": true,
+      "declaration": true,
+      "sourceMap": true,
+      "rootDir": "./",
+      "strict": true,
+      "noImplicitAny": true,
+      "strictNullChecks": true,
+      "strictFunctionTypes": true,
+      "strictPropertyInitialization": true,
+      "noImplicitThis": true,
+      "alwaysStrict": true,
+      "noUnusedLocals": false,
+      "noUnusedParameters": false,
+      "noFallthroughCasesInSwitch": true,
+      "moduleResolution": "node",
+      "baseUrl": "./",
+      "paths": {
+        "*": ["src/*", "node_modules/*"]
+      },
+      "esModuleInterop": true
+    },
+    "exclude": ["node_modules", "**/*.spec.ts"]
+  }

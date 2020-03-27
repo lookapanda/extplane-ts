@@ -1,0 +1,152 @@
+{
+  "name": "@lookapanda/extplane-ts",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=10.18"
+  },
+  "description": "A TypeScript client library for NodeJs that uses the ExtPlane plugin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:lookapanda/extplane-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lookapanda/extplane-ts/issues"
+  },
+  "author": "lookapanda <sn@hitbox.tv> (https://github.com/lookapanda)",
+  "main": "dist/index.js",
+  "module": "dist/extplane-ts.esm.js",
+  "typings": "dist/index.d.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "start": "tsdx watch",
+    "build": "tsdx build",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "semantic-release": "semantic-release"
+  },
+  "release": {
+    "branch": "master"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsdx lint",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "devDependencies": {
+    "@babel/core": "^7.9.0",
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.8.3",
+    "@babel/plugin-proposal-object-rest-spread": "^7.9.0",
+    "@babel/plugin-proposal-optional-chaining": "^7.9.0",
+    "@babel/preset-env": "^7.9.0",
+    "@babel/preset-typescript": "^7.9.0",
+    "@commitlint/cli": "^8.2.0",
+    "@commitlint/config-conventional": "^8.2.0",
+    "@semantic-release/changelog": "^5.0.1",
+    "@semantic-release/git": "^9.0.0",
+    "@types/debug": "^4.1.5",
+    "@types/jest": "^25.1.4",
+    "@types/node": "^12.12.31",
+    "@typescript-eslint/eslint-plugin": "^2.5.0",
+    "@typescript-eslint/parser": "^2.5.0",
+    "babel-jest": "^25.2.3",
+    "eslint": "^6.5.1",
+    "eslint-config-prettier": "^6.4.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "husky": "^4.2.3",
+    "prettier": "^2.0.2",
+    "semantic-release": "^17.0.4",
+    "ts-node": "^8.8.1",
+    "tsdx": "^0.12.3",
+    "tslib": "^1.10.0",
+    "typescript": "^3.8.3"
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "esmodules": true
+          }
+        }
+      ],
+      "@babel/preset-typescript"
+    ],
+    "plugins": [
+      "@babel/proposal-class-properties",
+      "@babel/proposal-object-rest-spread",
+      "@babel/proposal-optional-chaining",
+      "@babel/proposal-nullish-coalescing-operator"
+    ]
+  },
+  "jest": {
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "verbose": true
+  },
+  "prettier": {
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "semi": true,
+    "arrowParens": "avoid",
+    "parser": "typescript"
+  },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "extends": [
+      "plugin:@typescript-eslint/recommended",
+      "prettier/@typescript-eslint",
+      "plugin:prettier/recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 2018,
+      "sourceType": "module"
+    },
+    "plugins": [
+      "prettier"
+    ],
+    "rules": {
+      "prettier/prettier": "error",
+      "@typescript-eslint/interface-name-prefix": 0,
+      "@typescript-eslint/explicit-function-return-type": 0,
+      "@typescript-eslint/explicit-member-accessibility": 0,
+      "@typescript-eslint/no-explicit-any": 0,
+      "@typescript-eslint/camelcase": 0,
+      "@typescript-eslint/no-parameter-properties": 0,
+      "@typescript-eslint/no-inferrable-types": [
+        1,
+        {
+          "ignoreParameters": true,
+          "ignoreProperties": true
+        }
+      ],
+      "@typescript-eslint/no-non-null-assertion": 0
+    }
+  },
+  "dependencies": {
+    "debug": "^4.1.1",
+    "jest": "^25.2.3"
+  }
+}
