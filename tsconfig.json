@@ -1,5 +1,5 @@
 {
-    "include": ["src", "types"],
+    "include": ["src", "types", "test.ts"],
     "compilerOptions": {
       "target": "esnext",
       "module": "esnext",
@@ -8,13 +8,8 @@
       "declaration": true,
       "sourceMap": true,
       "rootDir": "./",
-      "strict": true,
       "noImplicitAny": true,
-      "strictNullChecks": true,
-      "strictFunctionTypes": true,
-      "strictPropertyInitialization": true,
       "noImplicitThis": true,
-      "alwaysStrict": true,
       "noUnusedLocals": false,
       "noUnusedParameters": false,
       "noFallthroughCasesInSwitch": true,

@@ -8,9 +8,11 @@ class MockTcpSocket extends EventEmitter {
         super();
 
         setTimeout(() => {
+            this.emit('connect');
             this.emit('data', 'EXTPLANE');
         });
     }
+
     write = jest.fn((data: Buffer) => {
         this.emit('write', data);
     });

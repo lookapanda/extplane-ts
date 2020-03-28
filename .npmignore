@@ -19,3 +19,4 @@ dist
 static
 *.config.js
 gulpfile.js
+example.js

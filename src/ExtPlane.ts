@@ -1,6 +1,7 @@
-import { EventEmitter } from 'events';
 import { Socket, connect } from 'net';
 import Debug from 'debug';
+import { fromEvent, Observable, from, BehaviorSubject } from 'rxjs';
+import { first, takeUntil, map, filter, mergeMap } from 'rxjs/operators';
 
 const debug = Debug('extplane');
 
@@ -11,91 +12,209 @@ export interface ExtPlaneOptions {
     broadcast?: boolean;
 }
 
-export class ExtPlane extends EventEmitter {
+export class ExtPlane {
     private readonly host?: string;
     private readonly port?: number;
     private readonly debug?: boolean;
-    private readonly broadcast?: boolean;
-    private readonly socket: Socket;
-    private _isConnected = false;
+    private socket: Socket;
+    private _isConnected = new BehaviorSubject<boolean>(false);
+    private subscriptions: string[] = [];
+    private data$: Observable<[string, any]>;
 
     constructor(options: ExtPlaneOptions = {}) {
-        super();
-
         this.host = options?.host || '127.0.0.1';
         this.port = options?.port || 51000;
         this.debug = options?.debug;
-        this.broadcast = options?.broadcast;
+    }
 
+    /**
+     * Starts listening for one or more dataRefs
+     * @param dataRef string | string[]
+     * @param accuracy number optional
+     */
+    observe(dataRef: string, accuracy?: number): Observable<[string, any]>;
+    observe(dataRef: string[]): Observable<[string, any]>;
+    observe(dataRef: string | string[], accuracy?: number) {
+        if (!this.data$) {
+            this.data$ = this.getObservable();
+        }
+
+        if (Array.isArray(dataRef)) {
+            dataRef.forEach(dref => {
+                if (Array.isArray(dref)) {
+                    this.subscribe(dref[0], dref[1]);
+                    this.subscriptions = [...this.subscriptions, dref[0]];
+                    return;
+                }
+                this.subscribe(dref);
+                this.subscriptions = [...this.subscriptions, dref];
+            });
+        } else {
+            this.subscribe(dataRef, accuracy);
+            this.subscriptions = [...this.subscriptions, dataRef];
+        }
+
+        return this.data$;
+    }
+
+    /**
+     * Deregisters the given dataRef or dataRefs
+     * @param dataRef string | string[]
+     */
+    unobserve(dataRef: string | string[]) {
+        if (Array.isArray(dataRef)) {
+            dataRef.forEach(dref => {
+                this.unsubscribe(dref);
+            });
+            this.subscriptions = this.subscriptions.filter(
+                sub => !dataRef.includes(sub)
+            );
+            return;
+        }
+
+        this.unsubscribe(dataRef);
+        this.subscriptions = this.subscriptions.filter(sub => sub !== dataRef);
+    }
+
+    /**
+     * Creates a new connection and returns ExtPlane
+     */
+    connect() {
+        if (this.socket) {
+            this.disconnect();
+        }
+
+        this._isConnected = new BehaviorSubject<boolean>(false);
         this.socket = connect({
             host: this.host,
             port: this.port,
         });
 
-        this.setupListeners();
+        fromEvent(this.socket, 'connect')
+            .pipe(first())
+            .subscribe({
+                complete: () => {
+                    this._isConnected.next(true);
+                },
+            });
+
+        fromEvent(this.socket, 'end')
+            .pipe(first())
+            .subscribe({
+                complete: () => {
+                    this.disconnect(true);
+                },
+            });
+
+        fromEvent(this.socket, 'error')
+            .pipe(first())
+            .subscribe({
+                next: (error: Error) => {
+                    this.disconnect(true);
+                    throw error;
+                },
+            });
 
         if (this.debug) {
-            this.log(`Connected to ${this.host}:${this.port}`, 'bar');
+            this.log(`Connected to ${this.host}:${this.port}`);
         }
+
+        return this;
     }
 
-    get isConnected() {
-        return this._isConnected;
+    /**
+     * Disconnects the client
+     */
+    disconnect(fromSocket?: boolean) {
+        if (!fromSocket) {
+            this.socketWrite('disconnect');
+            this.socket.end();
+        }
+        this.socket = undefined;
+        this.subscriptions = [];
+        this._isConnected.complete();
     }
 
-    get client() {
-        return {
-            key: this.clientKey,
-            cmd: this.clientCmd,
-            begin: this.clientBegin,
-            end: this.clientEnd,
-            button: this.clientButton,
-            release: this.clientRelease,
-            set: this.clientSet,
-            subscribe: this.clientSubscribe,
-            unsubscribe: this.clientUnsubscribe,
-            interval: this.clientInterval,
-            disconnect: this.clientDisconnect,
-        };
+    /**
+     * How often ExtPlane should update ist data from X-Plane in milliseconds
+     * @default 333
+     * @param interval number
+     */
+    interval(interval: number) {
+        if (typeof interval !== 'number') {
+            throw new Error(
+                `Invalid type '${typeof interval}' of argument 'interval'!`
+            );
+        }
+        this.socketWrite(`extplane-set update_interval ${interval / 1000}`);
+
+        return this;
+    }
+
+    private getObservable() {
+        if (!this.socket) {
+            this.connect();
+        }
+
+        const end$ = fromEvent(this.socket, 'end').pipe(first());
+        const data$ = fromEvent(this.socket, 'data').pipe(
+            map((data: any) => {
+                const dataStr = data.toString();
+                if (dataStr.includes('EXTPLANE')) {
+                    return;
+                }
+
+                const commands = dataStr.trim().split('\n');
+
+                const map = commands.map((command: string) => {
+                    const params = command.split(' ');
+
+                    if (params[0][0] !== 'u') {
+                        return;
+                    }
+
+                    const ref = params[1];
+
+                    if (!this.subscriptions.includes(ref)) {
+                        return;
+                    }
+                    const type = params[0].substring(1);
+                    const value = this.parseValue(type, params[2]);
+
+                    return [ref, value];
+                });
+
+                return map;
+            }),
+            takeUntil(end$)
+        );
+
+        return from<Observable<[string, any]>>(data$).pipe(
+            mergeMap(value => (value ? value : [])),
+            filter(a => !!a)
+        );
+    }
+
+    get connected() {
+        return new Promise(resolve => {
+            this._isConnected.subscribe({
+                next: () => resolve(true),
+                complete: () => resolve(false),
+            });
+        });
     }
 
     private socketWrite(value: string) {
+        if (!this.socket) {
+            this.connect();
+        }
+        if (this.debug) {
+            this.log('Writing to Socket:', value);
+        }
         this.socket.write(`${value}\r\n`);
     }
 
-    private clientKey = (keyId: string) => {
-        this.socketWrite(`key${keyId}`);
-    };
-
-    private clientWriteCmd = (type: string, value: string) => {
-        this.socketWrite(`cmd ${type} ${value}`);
-    };
-
-    private clientCmd = (cmd: string) => {
-        this.clientWriteCmd('once', cmd);
-    };
-
-    private clientBegin = (cmd: string) => {
-        this.clientWriteCmd('begin', cmd);
-    };
-
-    private clientEnd = (cmd: string) => {
-        this.clientWriteCmd('end', cmd);
-    };
-
-    private clientButton = (buttonId: string) => {
-        this.socketWrite(`but ${buttonId}`);
-    };
-
-    private clientRelease = (buttonId: string) => {
-        this.socketWrite(`rel ${buttonId}`);
-    };
-
-    private clientSet = (dataRef: string, value: string) => {
-        this.socketWrite(`set ${dataRef} ${value}`);
-    };
-
-    private clientSubscribe = (dataRef: string, accuracy?: number) => {
+    private subscribe = (dataRef: string, accuracy?: number) => {
         this.socketWrite(
             `sub ${dataRef}${
                 typeof accuracy !== 'undefined' ? ` ${accuracy}` : ''
@@ -103,96 +222,9 @@ export class ExtPlane extends EventEmitter {
         );
     };
 
-    private clientUnsubscribe = (dataRef: string) => {
+    private unsubscribe = (dataRef: string) => {
         this.socketWrite(`unsub ${dataRef}`);
     };
-
-    private clientInterval = (value: number) => {
-        this.socketWrite(`extplane-set update_interval ${value}`);
-    };
-
-    private clientDisconnect = () => {
-        this.socketWrite('disconnect');
-        this.socket.end();
-    };
-
-    private setupListeners() {
-        const onSocketEnd = () => {
-            this._isConnected = false;
-            if (this.debug) {
-                this.log('Disconnected from server');
-            }
-        };
-
-        const onSocketError = (error: Error) => {
-            if (this.debug) {
-                this.log('An error occurred:', error);
-            }
-        };
-
-        const onSocketData = (data: any) => {
-            this.emit('data', data);
-        };
-
-        this.socket.on('end', onSocketEnd);
-        this.socket.on('error', onSocketError);
-        this.socket.on('data', onSocketData);
-
-        this.on('loaded', this.onLoaded);
-        this.on('data', this.onData);
-        this.on('parse', this.onParse);
-    }
-
-    private onLoaded = () => {
-        this._isConnected = true;
-        if (this.debug) {
-            this.log('ExtPlane is ready!');
-        }
-    };
-
-    private onData = (data: any) => {
-        const dataStr = data.toString();
-        if (dataStr.includes('EXTPLANE')) {
-            this.emit('loaded');
-            return;
-        }
-
-        this.emit('parse', dataStr);
-    };
-
-    private onParse = (data: string) => {
-        const commands = data.trim().split('\n');
-
-        commands.forEach(async command => {
-            try {
-                await this.parseDataRef(command);
-            } catch (e) {
-                if (this.debug) {
-                    this.log(e);
-                }
-            }
-        });
-    };
-
-    private async parseDataRef(dataRef: string) {
-        const params = dataRef.split(' ');
-
-        if (params[0][0] !== 'u') {
-            return Promise.reject();
-        }
-
-        const ref = params[1];
-        const type = params[0].substring(1);
-        const value = this.parseValue(type, params[2]);
-
-        if (!this.broadcast) {
-            this.emit(ref, ref, value);
-        } else {
-            this.emit('data-ref', ref, value);
-        }
-
-        return Promise.resolve();
-    }
 
     private parseValue(type: string, value: string) {
         switch (type) {

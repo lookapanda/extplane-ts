@@ -10,18 +10,17 @@ describe('ExtPlane', () => {
         extPlane = new ExtPlane();
     });
 
-    it('Connect to ExtPlane', done => {
-        extPlane.on('loaded', () => {
-            expect(extPlane.isConnected).toBe(true);
-            done();
-        });
+    it('Connect to ExtPlane', async done => {
+        extPlane.connect();
+        const isConnected = await extPlane.connected;
+        expect(isConnected).toBe(true);
+        done();
     });
 
-    it('Close Connection', done => {
-        extPlane.on('loaded', () => {
-            extPlane.client.disconnect();
-            expect(extPlane.isConnected).toBe(false);
-            done();
-        });
+    it('Close Connection', async done => {
+        extPlane.connect();
+        extPlane.disconnect();
+        expect(await extPlane.connected).toBe(false);
+        done();
     });
 });
