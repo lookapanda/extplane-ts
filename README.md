@@ -6,7 +6,7 @@
 
 A TypeScript client library for nodeJs that uses the [ExtPlane plugin](https://github.com/vranki/ExtPlane).
 
-Based on [ExtPlaneJs)(https://github.com/wadedos/ExtPlaneJs)
+Based on [ExtPlaneJs](https://github.com/wadedos/ExtPlaneJs)
 
 ## Prerequisites
 1. You obviously need X-Plane with the [ExtPlane plugin](https://github.com/vranki/ExtPlane) installed.
