@@ -10,6 +10,7 @@ class MockTcpSocket extends EventEmitter {
         setTimeout(() => {
             this.emit('connect');
             this.emit('data', 'EXTPLANE');
+            this.emit('data', 'uf sim/time/framerate_period 0.02');
         });
     }
 

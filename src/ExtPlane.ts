@@ -1,7 +1,15 @@
 import { Socket, connect } from 'net';
 import Debug from 'debug';
 import { fromEvent, Observable, from, BehaviorSubject } from 'rxjs';
-import { first, takeUntil, map, filter, mergeMap } from 'rxjs/operators';
+import {
+    first,
+    takeUntil,
+    map,
+    filter,
+    mergeMap,
+    flatMap,
+    skipWhile,
+} from 'rxjs/operators';
 
 const debug = Debug('extplane');
 
@@ -18,6 +26,7 @@ export class ExtPlane {
     private readonly debug?: boolean;
     private socket: Socket;
     private _isConnected = new BehaviorSubject<boolean>(false);
+    private _isReady = new BehaviorSubject<boolean>(false);
     private subscriptions: string[] = [];
     private data$: Observable<[string, any]>;
 
@@ -33,14 +42,19 @@ export class ExtPlane {
      * @param accuracy number optional
      */
     observe(dataRef: string, accuracy?: number): Observable<[string, any]>;
-    observe(dataRef: string[]): Observable<[string, any]>;
-    observe(dataRef: string | string[], accuracy?: number) {
+    observe(
+        dataRef: string[] | Array<string | [string, number]>
+    ): Observable<[string, any]>;
+    observe(
+        dataRef: string | string[] | Array<string | [string, number]>,
+        accuracy?: number
+    ) {
         if (!this.data$) {
             this.data$ = this.getObservable();
         }
 
         if (Array.isArray(dataRef)) {
-            dataRef.forEach(dref => {
+            dataRef.forEach((dref: string | [string, number]) => {
                 if (Array.isArray(dref)) {
                     this.subscribe(dref[0], dref[1]);
                     this.subscriptions = [...this.subscriptions, dref[0]];
@@ -69,11 +83,16 @@ export class ExtPlane {
             this.subscriptions = this.subscriptions.filter(
                 sub => !dataRef.includes(sub)
             );
-            return;
+        } else {
+            this.unsubscribe(dataRef);
+            this.subscriptions = this.subscriptions.filter(
+                sub => sub !== dataRef
+            );
         }
 
-        this.unsubscribe(dataRef);
-        this.subscriptions = this.subscriptions.filter(sub => sub !== dataRef);
+        if (this.subscriptions.length === 0) {
+            this.disconnect();
+        }
     }
 
     /**
@@ -85,6 +104,7 @@ export class ExtPlane {
         }
 
         this._isConnected = new BehaviorSubject<boolean>(false);
+        this._isReady = new BehaviorSubject<boolean>(false);
         this.socket = connect({
             host: this.host,
             port: this.port,
@@ -133,6 +153,7 @@ export class ExtPlane {
         this.socket = undefined;
         this.subscriptions = [];
         this._isConnected.complete();
+        this._isReady.complete();
     }
 
     /**
@@ -153,7 +174,7 @@ export class ExtPlane {
 
     private getObservable() {
         if (!this.socket) {
-            this.connect();
+            throw new Error('You need to connect first!');
         }
 
         const end$ = fromEvent(this.socket, 'end').pipe(first());
@@ -161,6 +182,7 @@ export class ExtPlane {
             map((data: any) => {
                 const dataStr = data.toString();
                 if (dataStr.includes('EXTPLANE')) {
+                    this._isReady.next(true);
                     return;
                 }
 
@@ -191,13 +213,22 @@ export class ExtPlane {
 
         return from<Observable<[string, any]>>(data$).pipe(
             mergeMap(value => (value ? value : [])),
-            filter(a => !!a)
+            filter(a => a !== true || !Array.isArray(a))
         );
     }
 
     get connected() {
         return new Promise(resolve => {
             this._isConnected.subscribe({
+                next: () => resolve(true),
+                complete: () => resolve(false),
+            });
+        });
+    }
+
+    get ready() {
+        return new Promise(resolve => {
+            this._isReady.subscribe({
                 next: () => resolve(true),
                 complete: () => resolve(false),
             });

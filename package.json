@@ -115,6 +115,7 @@
     "arrowParens": "avoid",
     "parser": "typescript"
   },
+  "eslintIgnore": ["*.spec.ts"],
   "eslintConfig": {
     "parser": "@typescript-eslint/parser",
     "extends": [
